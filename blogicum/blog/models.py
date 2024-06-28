@@ -91,7 +91,13 @@ class Post(BaseModel):
         on_delete=models.SET_NULL,
         null=True,
         verbose_name='Категория',
-        related_name='posts'
+        related_name='posts',
+        help_text=''
+    )
+    image = models.ImageField(
+        verbose_name='Фото',
+        upload_to='post_images',
+        blank=True
     )
 
     class Meta:

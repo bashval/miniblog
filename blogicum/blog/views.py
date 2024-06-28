@@ -1,6 +1,9 @@
 from datetime import datetime
+from django.db.models.base import Model as Model
+from django.db.models.query import QuerySet
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth import get_user_model
+from django.urls import reverse_lazy
 from django.views.generic import (
     ListView,
     DetailView,
@@ -9,7 +12,8 @@ from django.views.generic import (
     DeleteView
 )
 
-from blog.models import Post, Category
+from .models import Post, Category
+from .forms import PostForm
 from . import constants
 
 
@@ -37,6 +41,19 @@ def category_posts(request, category_slug):
         'category': category
     }
     return render(request, template, context)
+
+
+class PostCreateView(CreateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/create.html'
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
 
 
 class PostListView(ListView):
@@ -95,6 +112,10 @@ def post_detail(request, id):
     context = {'post': post}
     return render(request, template, context)
 
+
+# class AuthorListView(ListView):
+
+
 def profile(request, username):
     template = 'blog/profile.html'
     author = get_object_or_404(
@@ -116,5 +137,23 @@ def profile(request, username):
     return render(request, template, context)
 
 
-def create_post(request):
-    return 'post created'
+class ProfileUpdateView(UpdateView):
+    model = User
+    template_name = 'blog/user.html'
+    fields = (
+        'username',
+        'first_name',
+        'last_name',
+        'email'
+    )
+
+    def get_object(self, queryset=None):
+        object = self.model.objects.get(username=self.request.user)
+        return object
+
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
+
+
+def edit_profile(request, username):
+    return render(request, 'blog/.html')

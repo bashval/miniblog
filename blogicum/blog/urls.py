@@ -15,5 +15,7 @@ urlpatterns = [
         name='category_posts'
     ),
     path('profile/<username>/', views.profile, name='profile'),
-    path('create_post/', views.create_post, name='create_post'),
+    path('posts/create/', views.PostCreateView.as_view(), name='create_post'),
+    # path('profile/<username>/edit/', views.edit_profile, name='edit_profile'),
+    path('edit_profile/', views.ProfileUpdateView.as_view(), name='edit_profile'),
 ]

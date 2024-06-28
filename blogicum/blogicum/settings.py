@@ -25,8 +25,10 @@ SECRET_KEY = 'django-insecure-dbsgshg*6a_82-=7i8jo=(%-l1u&uuro6s7n*%6@zy8(8%q&+0
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+]
 
 # Application definition
 
@@ -120,7 +122,7 @@ TIME_ZONE = 'UTC'
 
 USE_I18N = True
 
-USE_L10N = True
+USE_L10N = False
 
 USE_TZ = True
 
