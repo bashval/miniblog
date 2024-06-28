@@ -1,8 +1,11 @@
 from datetime import datetime
-from django.db.models.base import Model as Model
-from django.db.models.query import QuerySet
+# from django.db.models.base import Model as Model
+# from django.db.models.query import QuerySet
+from django.forms import BaseModelForm
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth import get_user_model
+from django.contrib.auth.mixins import UserPassesTestMixin, LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import (
     ListView,
@@ -12,8 +15,8 @@ from django.views.generic import (
     DeleteView
 )
 
-from .models import Post, Category
-from .forms import PostForm
+from .models import Post, Category, Comment
+from .forms import PostForm, CommentForm
 from . import constants
 
 
@@ -43,15 +46,40 @@ def category_posts(request, category_slug):
     return render(request, template, context)
 
 
-class PostCreateView(CreateView):
+class AuthorOnlyMixin(UserPassesTestMixin):
+    def test_func(self):
+        object = self.get_object()
+        return object.author == self.request.user
+
+
+class PostMixin:
     model = Post
     form_class = PostForm
     template_name = 'blog/create.html'
+
+
+class CommentMixin:
+    model = Comment
+    template_name = 'blog/comment.html'
+    form_class = CommentForm
+
+
+class PostCreateView(LoginRequiredMixin, PostMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
 
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
+
+
+class PostUpdateView(LoginRequiredMixin, AuthorOnlyMixin, PostMixin, UpdateView):
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'pk': self.request.GET.pk})
+
+
+class PostDeleteView(LoginRequiredMixin, AuthorOnlyMixin, PostMixin, DeleteView):
     def get_success_url(self):
         return reverse_lazy('blog:profile', kwargs={'username': self.request.user})
 
@@ -71,6 +99,34 @@ class PostListView(ListView):
     template_name = 'blog/index.html'
 
 
+class CommentCreateView(LoginRequiredMixin, CommentMixin, CreateView):
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.post = self.request.GET.post_id
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'pk':self.request.GET.post_id})
+
+
+class CommentUpdateView(LoginRequiredMixin, AuthorOnlyMixin, CommentMixin, UpdateView):
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'pk':self.request.GET.post_id})
+
+    def get_object(self, queryset=None):
+        object = self.model.objects.get(pk=self.request.GET.comment_id)
+        return object
+
+
+class CommentDeleteView(LoginRequiredMixin, AuthorOnlyMixin, CommentMixin, DeleteView):
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'pk':self.request.GET.post_id})
+
+    def get_object(self, queryset=None):
+        object = self.model.objects.get(id=self.request.GET.comment_id)
+        return object
+
+
 def index(request):
     template = 'blog/index.html'
     post_list = Post.objects.select_related(
@@ -85,7 +141,7 @@ def index(request):
     context = {'post_list': post_list}
     return render(request, template, context)
 
-
+'''
 class PostDetailView(DetailView):
     model = Post
     template_name = 'blog/detail.html'
@@ -97,19 +153,31 @@ class PostDetailView(DetailView):
         pub_date__lt=datetime.now(),
         is_published=True,
         category__is_published=True
-    )
+    )'''
 
 
-def post_detail(request, id):
+def post_detail(request, post_id):
     template = 'blog/detail.html'
     post = get_object_or_404(
         Post,
         pub_date__lt=datetime.now(),
         is_published=True,
         category__is_published=True,
-        pk=id
+        pk=post_id
     )
-    context = {'post': post}
+    comments = Comment.objects.select_related(
+        'author'
+    ).filter(
+        post=post_id
+    )
+    form = CommentForm(request.POST or None)
+    if form.is_valid():
+        form.save()
+    context = {
+        'post': post,
+        'comments': comments,
+        'form': form
+    }
     return render(request, template, context)
 
 
