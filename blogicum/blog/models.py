@@ -1,6 +1,5 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.urls import reverse
 
 from . import constants
 
@@ -117,18 +116,18 @@ class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
+        verbose_name='Комментируемый пост',
         related_name='comments'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(
         User,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        verbose_name='Автор комментария',
+        related_name='comments'
     )
 
-    class Mate:
+    class Meta:
         verbose_name = 'комментарий'
-        verbose_name_plural = 'Комменитарии'
+        verbose_name_plural = 'Комментарии'
         ordering = ('created_at',)
-
-    # def get_absolute_url(self):
-    #     return reverse('blog:post_detail', kwargs={'pk': self.post_id})
