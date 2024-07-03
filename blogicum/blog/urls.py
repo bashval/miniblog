@@ -48,7 +48,7 @@ urlpatterns = [
     ),
     path(
         'profile/<str:username>/',
-        views.profile,
+        views.ProfilePostListView.as_view(),
         name='profile'
     ),
     path(

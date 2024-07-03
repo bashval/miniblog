@@ -8,13 +8,6 @@ from . import constants
 User = get_user_model()
 
 
-class AddCommentCountQuerySet(models.QuerySet):
-    def add_comment_counts(self):
-        return self.annotate(
-            comment_count=models.Count('comments')
-        )
-
-
 class PublishedPostManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(
@@ -118,7 +111,7 @@ class Post(BaseModel):
         upload_to='post_images',
         blank=True
     )
-    objects = AddCommentCountQuerySet.as_manager()
+    objects = models.Manager()
     published = PublishedPostManager()
 
     class Meta:

@@ -1,8 +1,5 @@
-from datetime import datetime
-from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.views.generic import (
@@ -15,6 +12,7 @@ from django.views.generic import (
 from .mixins import AuthorOnlyMixin, PostMixin, CommentMixin
 from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm
+from .utils import get_published_or_author_posts
 from . import constants
 
 
@@ -92,41 +90,39 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         return reverse('blog:profile', kwargs={'username': self.request.user})
 
 
-def profile(request, username):
-    template = 'blog/profile.html'
-    author = get_object_or_404(
-        User,
-        username=username
-    )
-    if author == request.user:
-        model_manager = Post.objects
-    else:
-        model_manager = Post.published
-    post_list = model_manager.select_related(
-        'category',
-        'location',
-        'author'
-    ).filter(author=author).order_by('-pub_date')
+class ProfilePostListView(ListView):
+    template_name = 'blog/profile.html'
+    paginate_by = constants.POSTS_PER_PAGE
 
-    paginator = Paginator(post_list, constants.POSTS_PER_PAGE)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    context = {
-        'profile': author,
-        'page_obj': page_obj
-    }
-    return render(request, template, context)
+    def get_queryset(self):
+        queryset = get_published_or_author_posts(
+            Post,
+            self.request.user.id or None
+        ).filter(
+            author__username=self.kwargs['username']
+        ).select_related(
+            'category',
+            'location',
+            'author'
+        ).order_by('-pub_date')
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        profile = get_object_or_404(
+            User,
+            username=self.kwargs['username']
+        )
+        context['profile'] = profile
+        return context
 
 
 def post_detail(request, pk):
     template = 'blog/detail.html'
-    user_id = request.user.id if request.user.is_authenticated else None
     post = get_object_or_404(
-        Post,
-        Q(author_id=user_id) | (
-            Q(pub_date__lt=datetime.now())
-            & Q(is_published=True)
-            & Q(category__is_published=True)
+        get_published_or_author_posts(
+            Post,
+            request.user.id or None
         ),
         pk=pk,
     )
