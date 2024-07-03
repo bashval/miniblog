@@ -12,7 +12,6 @@ from django.views.generic import (
 from .mixins import AuthorOnlyMixin, PostMixin, CommentMixin
 from .models import Post, Category, Comment
 from .forms import PostForm, CommentForm
-from .utils import get_published_or_author_posts
 from . import constants
 
 
@@ -44,7 +43,7 @@ class PostDeleteView(AuthorOnlyMixin, PostMixin, DeleteView):
 
 class PostListView(ListView):
     template_name = 'blog/index.html'
-    queryset = Post.published.select_related(
+    queryset = Post.objects.published_or_author().select_related(
         'category',
         'location',
         'author'
@@ -95,9 +94,8 @@ class ProfilePostListView(ListView):
     paginate_by = constants.POSTS_PER_PAGE
 
     def get_queryset(self):
-        queryset = get_published_or_author_posts(
-            Post,
-            self.request.user.id or None
+        queryset = Post.objects.published_or_author(
+            author_id=self.request.user.id or None
         ).filter(
             author__username=self.kwargs['username']
         ).select_related(
@@ -120,8 +118,7 @@ class ProfilePostListView(ListView):
 def post_detail(request, pk):
     template = 'blog/detail.html'
     post = get_object_or_404(
-        get_published_or_author_posts(
-            Post,
+        Post.objects.published_or_author(
             request.user.id or None
         ),
         pk=pk,
@@ -145,7 +142,7 @@ class CategoryPostListView(ListView):
     paginate_by = constants.POSTS_PER_PAGE
 
     def get_queryset(self):
-        queryset = Post.published.select_related(
+        queryset = Post.objects.published_or_author().select_related(
             'author',
             'category',
             'location'

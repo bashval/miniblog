@@ -9,14 +9,18 @@ User = get_user_model()
 
 
 class PublishedPostManager(models.Manager):
-    def get_queryset(self):
-        return super().get_queryset().filter(
-            is_published=True,
-            category__is_published=True,
-            pub_date__lt=datetime.now()
+    def published_or_author(self, author_id=None):
+        queryset = super().get_queryset()
+        queryset = queryset.filter(
+            models.Q(author_id=author_id) | (
+                models.Q(pub_date__lt=datetime.now())
+                & models.Q(is_published=True)
+                & models.Q(category__is_published=True)
+            )
         ).annotate(
             comment_count=models.Count('comments')
         )
+        return queryset
 
 
 class BaseModel(models.Model):
@@ -111,8 +115,7 @@ class Post(BaseModel):
         upload_to='post_images',
         blank=True
     )
-    objects = models.Manager()
-    published = PublishedPostManager()
+    objects = PublishedPostManager()
 
     class Meta:
         verbose_name = 'публикация'
