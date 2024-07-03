@@ -10,8 +10,7 @@ User = get_user_model()
 
 class PublishedPostManager(models.Manager):
     def published_or_author(self, author_id=None):
-        queryset = super().get_queryset()
-        queryset = queryset.filter(
+        queryset = super().get_queryset().filter(
             models.Q(author_id=author_id) | (
                 models.Q(pub_date__lt=datetime.now())
                 & models.Q(is_published=True)
