@@ -43,7 +43,7 @@ urlpatterns = [
     ),
     path(
         'category/<slug:category_slug>/',
-        views.category_posts,
+        views.CategoryPostListView.as_view(),
         name='category_posts'
     ),
     path(

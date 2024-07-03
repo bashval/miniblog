@@ -1,3 +1,4 @@
+from datetime import datetime
 from django.db import models
 from django.contrib.auth import get_user_model
 
@@ -5,6 +6,24 @@ from . import constants
 
 
 User = get_user_model()
+
+
+class AddCommentCountQuerySet(models.QuerySet):
+    def add_comment_counts(self):
+        return self.annotate(
+            comment_count=models.Count('comments')
+        )
+
+
+class PublishedPostManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(
+            is_published=True,
+            category__is_published=True,
+            pub_date__lt=datetime.now()
+        ).annotate(
+            comment_count=models.Count('comments')
+        )
 
 
 class BaseModel(models.Model):
@@ -99,6 +118,8 @@ class Post(BaseModel):
         upload_to='post_images',
         blank=True
     )
+    objects = AddCommentCountQuerySet.as_manager()
+    published = PublishedPostManager()
 
     class Meta:
         verbose_name = 'публикация'
@@ -131,3 +152,6 @@ class Comment(models.Model):
         verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'
         ordering = ('created_at',)
+
+    def __str__(self):
+        return f'Комментарий ({self.id}) к посту({self.post_id})'
