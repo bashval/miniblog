@@ -10,7 +10,7 @@ from django.views.generic import (
 )
 
 from .mixins import AuthorOnlyMixin, PostMixin, CommentMixin
-from .models import Post, Category, Comment
+from .models import Post, Category
 from .forms import PostForm, CommentForm
 from . import constants
 
@@ -43,11 +43,9 @@ class PostDeleteView(AuthorOnlyMixin, PostMixin, DeleteView):
 
 class PostListView(ListView):
     template_name = 'blog/index.html'
-    queryset = Post.objects.published_or_author().select_related(
-        'category',
-        'location',
-        'author'
-    )
+    queryset = (Post.objects.published()
+                            .with_comment_count_and_related_fields()
+                )
     paginate_by = constants.POSTS_PER_PAGE
     ordering = ('-pub_date',)
 
@@ -60,7 +58,7 @@ class CommentCreateView(LoginRequiredMixin, CommentMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.author = self.request.user
-        form.instance.post_id = self.kwargs['post_id']
+        form.instance.post_id = self.blog_post.id
         return super().form_valid(form)
 
 
@@ -94,38 +92,41 @@ class ProfilePostListView(ListView):
     paginate_by = constants.POSTS_PER_PAGE
 
     def get_queryset(self):
-        queryset = Post.objects.published_or_author(
-            author_id=self.request.user.id or None
-        ).filter(
-            author__username=self.kwargs['username']
-        ).select_related(
-            'category',
-            'location',
-            'author'
-        ).order_by('-pub_date')
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        profile = get_object_or_404(
+        self.profile = get_object_or_404(
             User,
             username=self.kwargs['username']
         )
-        context['profile'] = profile
+        queryset = Post.objects.filter(
+            author=self.profile
+        )
+        if self.request.user.is_authenticated:
+            user_id = self.request.user.id
+            queryset = (
+                queryset.filter(author_id=user_id) | queryset.published()
+            )
+        return (queryset
+                .with_comment_count_and_related_fields()
+                .order_by('-pub_date')
+                )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['profile'] = self.profile
         return context
 
 
 def post_detail(request, pk):
     template = 'blog/detail.html'
+    queryset = Post.objects.published()
+    if request.user.is_authenticated:
+        user_id = request.user.id
+        queryset |= Post.objects.filter(author_id=user_id)
+
     post = get_object_or_404(
-        Post.objects.published_or_author(
-            request.user.id or None
-        ),
+        queryset,
         pk=pk,
     )
-    comments = Comment.objects.select_related(
-        'author'
-    ).filter(post=pk)
+    comments = post.comments.select_related('author')
     form = CommentForm(request.POST or None)
     if form.is_valid():
         form.save()
@@ -142,21 +143,20 @@ class CategoryPostListView(ListView):
     paginate_by = constants.POSTS_PER_PAGE
 
     def get_queryset(self):
-        queryset = Post.objects.published_or_author().select_related(
-            'author',
-            'category',
-            'location'
-        ).filter(
-            category__slug=self.kwargs['category_slug']
-        ).order_by('-pub_date')
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        category = get_object_or_404(
+        self.category = get_object_or_404(
             Category,
             is_published=True,
             slug=self.kwargs['category_slug']
         )
-        context['category'] = category
+        queryset = Post.objects.published().filter(
+            category=self.category
+        )
+        return (queryset
+                .with_comment_count_and_related_fields()
+                .order_by('-pub_date')
+                )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['category'] = self.category
         return context
